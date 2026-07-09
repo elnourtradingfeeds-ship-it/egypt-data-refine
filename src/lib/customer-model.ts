@@ -85,8 +85,7 @@ export function classifyYear(
   if (historicalMonthlyAvg && historicalMonthlyAvg > 0) {
     const ratio = last3Avg / historicalMonthlyAvg;
     if (ratio < 0.3) return "stagnant";
-    if (ratio < 0.6) return "atrisk";
-    if (ratio < 0.7) return "atrisk"; // still concerning
+    if (ratio < 0.7) return "atrisk";
   }
 
   return "active";
