@@ -53,6 +53,10 @@ export function parseSalesWorkbook(buf: ArrayBuffer, year: number): SalesRow[] {
     if (!row || row.length < 3) continue;
     const code = String(row[0] ?? "").trim();
     const name = String(row[1] ?? "").trim();
+    // Ignore visual separator rows from the source Excel (e.g. "----" placeholders
+    // that aren't real customers, just aesthetic dividers between number groups).
+    if (isDashLike(code) && isDashLike(name)) continue;
+    if (isDashLike(code)) continue;
     if (!code || code.toLowerCase() === "nan") continue;
     if (isTotalRow(code, name)) continue;
     const monthly: number[] = [];
