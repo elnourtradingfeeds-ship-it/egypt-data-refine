@@ -1,0 +1,256 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { z } from "zod";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { Search, ArrowRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { useCustomers, useDataStore } from "@/lib/store";
+import { fmtCompact, fmtEGP, fmtInt, fmtPct } from "@/lib/format";
+import { ARABIC_MONTHS } from "@/lib/format";
+import { Section } from "@/components/Section";
+import { KpiCard } from "@/components/KpiCard";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Input } from "@/components/ui/input";
+import { tooltipEGP } from "@/lib/recharts-format";
+import type { Customer } from "@/lib/customer-model";
+import { cn } from "@/lib/utils";
+
+const searchSchema = z.object({ code: z.string().optional() });
+
+export const Route = createFileRoute("/customers")({
+  validateSearch: (s) => searchSchema.parse(s),
+  head: () => ({
+    meta: [
+      { title: "رحلة العميل 360° — منصّة المبيعات والمقبوضات" },
+      { name: "description", content: "بروفايل العميل الكامل عبر السنوات مع المبيعات والمقبوضات ورصيد الحساب." },
+    ],
+  }),
+  component: CustomersPage,
+});
+
+function CustomersPage() {
+  const { code } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const customers = useCustomers();
+  const meta = useDataStore((s) => s.meta);
+  const [q, setQ] = useState("");
+
+  const filtered = useMemo(
+    () =>
+      customers
+        .filter((c) => c.salesAll > 0 || c.collectionsAll > 0)
+        .filter((c) => (q ? c.name.includes(q) || c.code.includes(q) : true))
+        .sort((a, b) => b.salesAll - a.salesAll),
+    [customers, q],
+  );
+
+  const selected = useMemo(() => customers.find((c) => c.code === code) ?? filtered[0], [customers, code, filtered]);
+
+  return (
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight">رحلة العميل 360°</h1>
+        <p className="mt-1 text-sm text-muted-foreground">بروفايل كامل عبر السنوات: مبيعات، مقبوضات، ورصيد.</p>
+      </header>
+
+      <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+        <Section title="اختر عميل" contentClassName="p-0">
+          <div className="border-b border-border p-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث…" className="pr-8" />
+            </div>
+          </div>
+          <div className="max-h-[600px] overflow-y-auto scrollbar-thin">
+            {filtered.slice(0, 200).map((c) => (
+              <button
+                key={c.code}
+                onClick={() => navigate({ search: { code: c.code }, replace: true })}
+                className={cn(
+                  "flex w-full items-center gap-2 border-b border-border/60 px-3 py-2 text-right text-xs transition hover:bg-muted",
+                  selected?.code === c.code && "bg-primary/10",
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold">{c.name}</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {c.code} · {fmtCompact(c.salesAll)}
+                  </div>
+                </div>
+                <StatusBadge status={c.statusOverall} size="xs" />
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        {selected ? <CustomerProfile customer={selected} years={meta.years} /> : <div>لا يوجد عميل</div>}
+      </div>
+    </div>
+  );
+}
+
+function CustomerProfile({ customer, years }: { customer: Customer; years: number[] }) {
+  const timeline = useMemo(() => {
+    const flat: Array<{ label: string; sales: number; collections: number; balance: number }> = [];
+    for (const y of years) {
+      const s = customer.sales[y] ?? Array(12).fill(0);
+      const c = customer.collections[y] ?? Array(12).fill(0);
+      for (let i = 0; i < 12; i++) {
+        flat.push({
+          label: `${ARABIC_MONTHS[i].slice(0, 3)} ${String(y).slice(2)}`,
+          sales: s[i],
+          collections: c[i],
+          balance: s[i] - c[i],
+        });
+      }
+    }
+    return flat;
+  }, [customer, years]);
+
+  const trendIcon =
+    customer.trendScore > 5 ? <TrendingUp className="h-4 w-4" /> :
+    customer.trendScore < -5 ? <TrendingDown className="h-4 w-4" /> :
+    <Minus className="h-4 w-4" />;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold">{customer.name}</h2>
+              <StatusBadge status={customer.statusOverall} />
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              كود: {customer.code} · تصنيف ABC: {customer.abc} · اتجاه:{" "}
+              <span className={cn(
+                "inline-flex items-center gap-1 font-semibold",
+                customer.trendScore > 5 ? "text-status-active" : customer.trendScore < -5 ? "text-status-stagnant" : "text-muted-foreground",
+              )}>
+                {trendIcon}
+                {customer.trendScore > 0 ? "+" : ""}{customer.trendScore}%
+              </span>
+            </div>
+          </div>
+          <Link to="/sales" className="text-xs font-semibold text-primary hover:underline">
+            رجوع لجدول المبيعات <ArrowRight className="inline h-3 w-3" />
+          </Link>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard label="إجمالي المبيعات" value={fmtEGP(customer.salesAll)} tone="primary" />
+          <KpiCard label="إجمالي المقبوضات" value={fmtEGP(customer.collectionsAll)} tone="info" />
+          <KpiCard
+            label="الرصيد التراكمي"
+            value={fmtEGP(customer.balanceAll)}
+            tone={customer.balanceAll > 0 ? "destructive" : customer.balanceAll < 0 ? "success" : "muted"}
+          />
+          <KpiCard
+            label="نسبة التحصيل"
+            value={fmtPct(customer.collectionRateAll)}
+            tone={customer.collectionRateAll >= 80 ? "success" : customer.collectionRateAll >= 60 ? "warning" : "destructive"}
+          />
+        </div>
+      </div>
+
+      <Section title="تفصيل سنوي">
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs text-muted-foreground">
+                <th className="px-3 py-2 text-right font-semibold">السنة</th>
+                <th className="px-3 py-2 text-right font-semibold">المبيعات</th>
+                <th className="px-3 py-2 text-right font-semibold">المقبوضات</th>
+                <th className="px-3 py-2 text-right font-semibold">الرصيد</th>
+                <th className="px-3 py-2 text-right font-semibold">التحصيل %</th>
+                <th className="px-3 py-2 text-center font-semibold">الحالة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {years.map((y) => {
+                const s = customer.salesByYear[y] ?? 0;
+                const c = customer.collectionsByYear[y] ?? 0;
+                return (
+                  <tr key={y} className="border-b border-border/50">
+                    <td className="px-3 py-2 font-bold">{y}</td>
+                    <td className="px-3 py-2 num">{fmtInt(s)}</td>
+                    <td className="px-3 py-2 num">{fmtInt(c)}</td>
+                    <td className={cn("px-3 py-2 num font-semibold", (s - c) > 0 ? "text-status-stagnant" : (s - c) < 0 ? "text-status-active" : "")}>
+                      {fmtInt(s - c)}
+                    </td>
+                    <td className="px-3 py-2 num">{fmtPct(s > 0 ? (c / s) * 100 : 0)}</td>
+                    <td className="px-3 py-2 text-center">
+                      <StatusBadge status={customer.statusByYear[y] ?? "inactive"} size="xs" />
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr className="border-t-2 border-border bg-muted/40 font-bold">
+                <td className="px-3 py-2">الإجمالي</td>
+                <td className="px-3 py-2 num">{fmtInt(customer.salesAll)}</td>
+                <td className="px-3 py-2 num">{fmtInt(customer.collectionsAll)}</td>
+                <td className={cn("px-3 py-2 num", customer.balanceAll > 0 ? "text-status-stagnant" : "text-status-active")}>
+                  {fmtInt(customer.balanceAll)}
+                </td>
+                <td className="px-3 py-2 num">{fmtPct(customer.collectionRateAll)}</td>
+                <td className="px-3 py-2"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      <Section title="خط زمني (36 شهر)" description="مبيعات، مقبوضات، ورصيد شهري">
+        <div className="h-80 w-full">
+          <ResponsiveContainer>
+            <ComposedChart data={timeline}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={2} />
+              <YAxis tickFormatter={(v: number) => fmtCompact(v)} tick={{ fontSize: 10 }} />
+              <Tooltip
+                formatter={tooltipEGP}
+                contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 8 }}
+              />
+              <Bar name="مبيعات" dataKey="sales" fill="var(--color-primary)" />
+              <Bar name="مقبوضات" dataKey="collections" fill="var(--color-status-active)" />
+              <Line name="الرصيد" type="monotone" dataKey="balance" stroke="var(--color-status-stagnant)" strokeWidth={1.5} dot={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </Section>
+
+      <Section title="ملاحظات">
+        <ul className="space-y-1 text-sm text-muted-foreground">
+          {customer.lastSale && (
+            <li>
+              • آخر عملية بيع مسجّلة: <strong className="text-foreground">{ARABIC_MONTHS[customer.lastSale.month]} {customer.lastSale.year}</strong>
+            </li>
+          )}
+          {customer.lastCollection && (
+            <li>
+              • آخر عملية تحصيل مسجّلة: <strong className="text-foreground">{ARABIC_MONTHS[customer.lastCollection.month]} {customer.lastCollection.year}</strong>
+            </li>
+          )}
+          <li>
+            • تصنيف ABC: <strong className="text-foreground">{customer.abc}</strong>
+            {customer.abc === "A" && " — ضمن أعلى 80% من المبيعات (عميل استراتيجي)"}
+            {customer.abc === "B" && " — ضمن الشريحة الوسطى"}
+            {customer.abc === "C" && " — من العملاء الصغار"}
+          </li>
+        </ul>
+      </Section>
+    </div>
+  );
+}
+
+// silence unused import (BarChart may not appear in JSX but kept for future extension)
+void BarChart;
