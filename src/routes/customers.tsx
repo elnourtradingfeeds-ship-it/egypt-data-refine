@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Search, ArrowRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Search, ArrowRight, TrendingUp, TrendingDown, Minus, Printer } from "lucide-react";
 import { useCustomers, useDataStore } from "@/lib/store";
 import { fmtCompact, fmtEGP, fmtInt, fmtPct } from "@/lib/format";
 import { ARABIC_MONTHS } from "@/lib/format";
@@ -20,9 +20,12 @@ import { Section } from "@/components/Section";
 import { KpiCard } from "@/components/KpiCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { tooltipEGP } from "@/lib/recharts-format";
 import type { Customer } from "@/lib/customer-model";
+import { STATUS_LABEL, type StatusKey } from "@/lib/customer-model";
 import { cn } from "@/lib/utils";
+import { printHtml, escapeHtml } from "@/lib/print";
 
 const searchSchema = z.object({ code: z.string().optional() });
 
@@ -43,14 +46,18 @@ function CustomersPage() {
   const customers = useCustomers();
   const meta = useDataStore((s) => s.meta);
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | StatusKey>("all");
+  const [abcFilter, setAbcFilter] = useState<"all" | "A" | "B" | "C">("all");
 
   const filtered = useMemo(
     () =>
       customers
         .filter((c) => c.salesAll > 0 || c.collectionsAll > 0)
+        .filter((c) => (statusFilter === "all" ? true : c.statusOverall === statusFilter))
+        .filter((c) => (abcFilter === "all" ? true : c.abc === abcFilter))
         .filter((c) => (q ? c.name.includes(q) || c.code.includes(q) : true))
         .sort((a, b) => b.salesAll - a.salesAll),
-    [customers, q],
+    [customers, q, statusFilter, abcFilter],
   );
 
   const selected = useMemo(() => customers.find((c) => c.code === code) ?? filtered[0], [customers, code, filtered]);
@@ -63,15 +70,43 @@ function CustomersPage() {
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-        <Section title="اختر عميل" contentClassName="p-0">
-          <div className="border-b border-border p-3">
+        <Section title={`اختر عميل (${fmtInt(filtered.length)})`} contentClassName="p-0">
+          <div className="space-y-2 border-b border-border p-3">
             <div className="relative">
               <Search className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث…" className="pr-8" />
             </div>
+            <div className="flex flex-wrap gap-1">
+              {(["all", "active", "atrisk", "stagnant", "inactive"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={cn(
+                    "rounded-md border border-border px-2 py-0.5 text-[10px] font-bold transition",
+                    statusFilter === s ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted",
+                  )}
+                >
+                  {s === "all" ? "الكل" : STATUS_LABEL[s]}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {(["all", "A", "B", "C"] as const).map((a) => (
+                <button
+                  key={a}
+                  onClick={() => setAbcFilter(a)}
+                  className={cn(
+                    "rounded-md border border-border px-2 py-0.5 text-[10px] font-bold transition",
+                    abcFilter === a ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted",
+                  )}
+                >
+                  {a === "all" ? "كل ABC" : a}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="max-h-[600px] overflow-y-auto scrollbar-thin">
-            {filtered.slice(0, 200).map((c) => (
+            {filtered.slice(0, 300).map((c) => (
               <button
                 key={c.code}
                 onClick={() => navigate({ search: { code: c.code }, replace: true })}
@@ -89,6 +124,9 @@ function CustomersPage() {
                 <StatusBadge status={c.statusOverall} size="xs" />
               </button>
             ))}
+            {filtered.length === 0 && (
+              <div className="p-4 text-center text-xs text-muted-foreground">لا نتائج</div>
+            )}
           </div>
         </Section>
 
@@ -141,9 +179,14 @@ function CustomerProfile({ customer, years }: { customer: Customer; years: numbe
               </span>
             </div>
           </div>
-          <Link to="/sales" className="text-xs font-semibold text-primary hover:underline">
-            رجوع لجدول المبيعات <ArrowRight className="inline h-3 w-3" />
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => printCustomer(customer, years)}>
+              <Printer className="ms-1 h-4 w-4" /> طباعة
+            </Button>
+            <Link to="/sales" className="text-xs font-semibold text-primary hover:underline">
+              رجوع لجدول المبيعات <ArrowRight className="inline h-3 w-3" />
+            </Link>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -252,5 +295,62 @@ function CustomerProfile({ customer, years }: { customer: Customer; years: numbe
   );
 }
 
-// silence unused import (BarChart may not appear in JSX but kept for future extension)
+function printCustomer(customer: Customer, years: number[]) {
+  const yearRows = years
+    .map((y) => {
+      const s = customer.salesByYear[y] ?? 0;
+      const co = customer.collectionsByYear[y] ?? 0;
+      return `<tr>
+        <td class="num"><strong>${y}</strong></td>
+        <td class="num">${fmtInt(s)}</td>
+        <td class="num">${fmtInt(co)}</td>
+        <td class="num">${fmtInt(s - co)}</td>
+        <td class="num">${fmtPct(s > 0 ? (co / s) * 100 : 0)}</td>
+        <td><span class="pill pill-${customer.statusByYear[y] === "stagnant" ? "red" : customer.statusByYear[y] === "atrisk" ? "amber" : customer.statusByYear[y] === "active" ? "green" : "gray"}">${STATUS_LABEL[customer.statusByYear[y] ?? "inactive"]}</span></td>
+      </tr>`;
+    })
+    .join("");
+
+  const monthlyRows = years
+    .map((y) => {
+      const s = customer.sales[y] ?? Array(12).fill(0);
+      const co = customer.collections[y] ?? Array(12).fill(0);
+      const cells = s
+        .map((val, i) => `<td class="num">${val ? fmtInt(val) : "—"}<div class="muted" style="font-size:9px">${co[i] ? fmtInt(co[i]) : ""}</div></td>`)
+        .join("");
+      return `<tr><td><strong>${y}</strong></td>${cells}</tr>`;
+    })
+    .join("");
+  const monthHeaders = ARABIC_MONTHS.map((m) => `<th>${m.slice(0, 3)}</th>`).join("");
+
+  const html = `
+    <div class="header">
+      <div>
+        <div class="brand">${escapeHtml(customer.name)}</div>
+        <div class="muted">كود: ${escapeHtml(customer.code)} · ABC: ${customer.abc} · الحالة: ${STATUS_LABEL[customer.statusOverall]}</div>
+      </div>
+      <div class="muted">${new Date().toLocaleDateString("ar-EG")}</div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><div class="k">إجمالي المبيعات</div><div class="v">${fmtInt(customer.salesAll)} ج.م</div></div>
+      <div class="card"><div class="k">إجمالي المقبوضات</div><div class="v">${fmtInt(customer.collectionsAll)} ج.م</div></div>
+      <div class="card"><div class="k">الرصيد التراكمي</div><div class="v">${fmtInt(customer.balanceAll)} ج.م</div></div>
+      <div class="card"><div class="k">نسبة التحصيل</div><div class="v">${fmtPct(customer.collectionRateAll)}</div></div>
+    </div>
+    <h2>تفصيل سنوي</h2>
+    <table><thead><tr><th>السنة</th><th>المبيعات</th><th>المقبوضات</th><th>الرصيد</th><th>التحصيل %</th><th>الحالة</th></tr></thead><tbody>${yearRows}</tbody></table>
+    <h2>خط زمني شهري (المبيعات / المقبوضات)</h2>
+    <table><thead><tr><th>السنة</th>${monthHeaders}</tr></thead><tbody>${monthlyRows}</tbody></table>
+    <p class="muted" style="margin-top:8px">الرقم العلوي في كل خانة: المبيعات — الرقم السفلي: المقبوضات (بالجنيه المصري).</p>
+    <h2>ملاحظات</h2>
+    <ul>
+      ${customer.lastSale ? `<li>آخر عملية بيع: <strong>${ARABIC_MONTHS[customer.lastSale.month]} ${customer.lastSale.year}</strong></li>` : ""}
+      ${customer.lastCollection ? `<li>آخر عملية تحصيل: <strong>${ARABIC_MONTHS[customer.lastCollection.month]} ${customer.lastCollection.year}</strong></li>` : ""}
+      <li>مؤشر الاتجاه (Trend Score): <strong>${customer.trendScore > 0 ? "+" : ""}${customer.trendScore}%</strong></li>
+    </ul>
+  `;
+  printHtml(`عميل — ${customer.name}`, html, { orientation: "landscape" });
+}
+
+// silence unused import
 void BarChart;

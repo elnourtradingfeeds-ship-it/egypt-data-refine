@@ -1,15 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import { useCustomers, useDataStore } from "@/lib/store";
 import { STATUS_LABEL, type StatusKey } from "@/lib/customer-model";
 import { Section } from "@/components/Section";
 import { KpiCard } from "@/components/KpiCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { fmtEGP, fmtInt, fmtPct } from "@/lib/format";
+import { fmtEGP, fmtInt, fmtPct, ARABIC_MONTHS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { printHtml, escapeHtml } from "@/lib/print";
 
 export const Route = createFileRoute("/stagnation")({
   head: () => ({
@@ -52,13 +53,59 @@ function StagnationPage() {
   const pages = Math.max(1, Math.ceil(filtered.length / perPage));
   const rows = filtered.slice((page - 1) * perPage, page * perPage);
 
+  const refYear = meta.currentYear;
+  const refMonth = Math.max(0, (meta.partialMonths[refYear] ?? 12) - 1);
+
+  function monthsAgo(c: (typeof customers)[number]): number | null {
+    if (!c.lastSale) return null;
+    return (refYear - c.lastSale.year) * 12 + (refMonth - c.lastSale.month);
+  }
+
+  function printCurrent() {
+    const list = filtered.map((c) => ({ c, g: monthsAgo(c) ?? 999 })).sort((a, b) => a.g - b.g);
+    const gapText = (g: number) => {
+      if (g >= 999) return "—";
+      if (g >= 12) { const y = Math.floor(g / 12); const m = g % 12; return `${y} سنة${m ? ` و${m} شهر` : ""}`; }
+      if (g === 0) return "هذا الشهر";
+      return `${g} شهر`;
+    };
+    const rows = list
+      .map((r, i) => `<tr>
+        <td class="num">${i + 1}</td>
+        <td>${escapeHtml(r.c.name)}<div class="muted">${escapeHtml(r.c.code)}</div></td>
+        <td><span class="pill pill-${r.c.statusOverall === "stagnant" ? "red" : r.c.statusOverall === "atrisk" ? "amber" : r.c.statusOverall === "active" ? "green" : "gray"}">${STATUS_LABEL[r.c.statusOverall]}</span></td>
+        <td class="num">${fmtInt(r.c.salesAll)}</td>
+        <td class="num">${fmtInt(r.c.balanceAll)}</td>
+        <td>${r.c.lastSale ? `${ARABIC_MONTHS[r.c.lastSale.month]} ${r.c.lastSale.year}` : "—"}</td>
+        <td>${gapText(r.g)}</td>
+        <td class="num">${fmtPct(r.c.collectionRateAll)}</td>
+      </tr>`).join("");
+    const label = statusFilter === "all" ? "كل الحالات" : STATUS_LABEL[statusFilter];
+    const html = `
+      <div class="header">
+        <div><div class="brand">تقرير العملاء — ${label}</div>
+        <div class="muted">${list.length} عميل · مرتّب حسب تاريخ آخر بيع (الأحدث أولاً)</div></div>
+        <div class="muted">${new Date().toLocaleDateString("ar-EG")}</div>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>العميل</th><th>الحالة</th><th>إجمالي البيع</th><th>الرصيد</th><th>آخر بيع</th><th>مدة التوقف</th><th>التحصيل %</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    printHtml(`تقرير ${label}`, html, { orientation: "landscape" });
+  }
+
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">تحليل الراكدين</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          تصنيف كل عميل بمعايير مركّبة عبر 3 مستويات، لكل سنة على حدة ولرحلة العميل ككل.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">تحليل الراكدين</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            تصنيف كل عميل بمعايير مركّبة عبر 3 مستويات، لكل سنة على حدة ولرحلة العميل ككل.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={printCurrent}>
+          <Printer className="ms-1 h-4 w-4" /> طباعة القائمة الحالية
+        </Button>
       </header>
 
       <Section title="التعريف المعتمد" description="القواعد التي تُطبَّق على كل عميل لكل سنة">
