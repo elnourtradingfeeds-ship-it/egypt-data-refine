@@ -93,7 +93,31 @@ function ReportsPage() {
   }
 
   function printReport() {
-    window.print();
+    const rows = kpiRows
+      .map(
+        (r) => `<tr>
+          <td class="num"><strong>${r.y}</strong></td>
+          <td class="num">${fmtInt(r.sales)}</td>
+          <td class="num">${fmtInt(r.collections)}</td>
+          <td class="num">${fmtInt(r.sales - r.collections)}</td>
+          <td class="num">${fmtPct(r.rate)}</td>
+        </tr>`,
+      )
+      .join("");
+    const html = `
+      <div class="header">
+        <div>
+          <div class="brand">تقرير المبيعات والمقبوضات — ${meta.currentYear}</div>
+          <div class="muted">يغطي الفترة ${meta.years[0]}–${meta.years[meta.years.length - 1]}</div>
+        </div>
+        <div class="muted">${new Date().toLocaleDateString("ar-EG")}</div>
+      </div>
+      <h2>الملخّص التنفيذي</h2>
+      <table>
+        <thead><tr><th>السنة</th><th>المبيعات</th><th>المقبوضات</th><th>الرصيد</th><th>نسبة التحصيل</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    printHtml("الملخّص التنفيذي", html);
   }
 
   const kpiRows = meta.years.map((y) => {
