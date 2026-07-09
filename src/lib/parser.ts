@@ -25,8 +25,18 @@ function isTotalRow(a: string, b: string): boolean {
   return TOTAL_HINTS.some((h) => t.includes(h.toLowerCase()));
 }
 
+/** True when a cell is empty, "nan", or purely dashes/underscores/dots/spaces (visual separator). */
+function isDashLike(v: string): boolean {
+  const s = v.trim();
+  if (!s) return true;
+  if (s.toLowerCase() === "nan") return true;
+  // Arabic/latin dashes, underscores, en/em dashes, hyphens, dots — any combination
+  return /^[-_\u2010-\u2015\u2212.\s]+$/.test(s);
+}
+
 function toNum(v: unknown): number {
   if (v == null || v === "") return 0;
+  if (typeof v === "string" && isDashLike(v)) return 0;
   const n = typeof v === "number" ? v : Number(String(v).replace(/,/g, ""));
   return isFinite(n) ? n : 0;
 }
