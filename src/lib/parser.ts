@@ -79,6 +79,9 @@ export function parseCollectionsWorkbook(buf: ArrayBuffer, year: number): Collec
     const row = rows[r];
     if (!row || row.length < 2) continue;
     const name = String(row[0] ?? "").trim();
+    // Ignore visual separator rows ("----" placeholders that are just number
+    // aggregation dividers, not real customers).
+    if (isDashLike(name)) continue;
     if (!name || name.toLowerCase() === "nan") continue;
     if (isTotalRow(name, "")) continue;
     const monthly: number[] = [];
