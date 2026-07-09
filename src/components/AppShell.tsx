@@ -11,6 +11,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "./ThemeToggle";
 
 type NavItem = { to: string; label: string; icon: typeof Upload; description: string };
 
@@ -33,10 +34,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sidebar-primary/20 text-sidebar-primary">
             <TrendingUp className="h-6 w-6" />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="text-sm font-bold leading-tight">منصّة المبيعات والمقبوضات</div>
-            <div className="text-xs text-sidebar-foreground/70">Sales & Collections Intelligence</div>
+            <div className="text-xs text-sidebar-foreground/70">Sales &amp; Collections Intelligence</div>
           </div>
+          <ThemeToggle />
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4 scrollbar-thin">
           {NAV.map((item) => {
@@ -75,6 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <TrendingUp className="h-5 w-5 text-primary" />
           منصّة المبيعات والمقبوضات
         </div>
+        <ThemeToggle />
       </header>
       <div className="lg:hidden">
         <nav className="scrollbar-thin flex gap-1 overflow-x-auto border-b border-border bg-card px-2 py-2">
