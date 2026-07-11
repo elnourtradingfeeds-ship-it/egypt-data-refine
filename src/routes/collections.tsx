@@ -95,15 +95,6 @@ function CollectionsPage() {
   const salesFor = (c: (typeof customers)[number]) =>
     year === "all" ? c.salesAll : (c.salesByYear[year as number] ?? 0);
 
-  const topDebtors = useMemo(
-    () =>
-      customers
-        .map((c) => ({ c, bal: balFor(c) }))
-        .filter((r) => r.bal > 0)
-        .sort((a, b) => b.bal - a.bal)
-        .slice(0, 15),
-    [customers, year], // eslint-disable-line react-hooks/exhaustive-deps
-  );
 
   const bestPayers = useMemo(
     () =>
