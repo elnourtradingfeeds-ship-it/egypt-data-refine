@@ -144,16 +144,6 @@ function CollectionsPage() {
         </tr>`,
       )
       .join("");
-    const debtorRows = topDebtors
-      .map(
-        (r, i) => `<tr>
-          <td class="num">${i + 1}</td>
-          <td>${escapeHtml(r.c.name)}<div class="muted">${escapeHtml(r.c.code)}</div></td>
-          <td class="num">${fmtInt(r.bal)}</td>
-          <td class="num">${fmtPct(rateFor(r.c))}</td>
-        </tr>`,
-      )
-      .join("");
     const paretoRows = paretoCollections
       .map(
         (r) => `<tr>
