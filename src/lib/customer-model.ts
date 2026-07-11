@@ -134,7 +134,7 @@ export function buildCustomers(
       c = {
         code: s.code,
         name: s.name,
-        nameKey: s.nameKey,
+        nameKey: normalizeName(s.name),
         sales: {},
         collections: {},
         salesByYear: {},
@@ -182,20 +182,37 @@ export function buildCustomers(
       cust = byCode.get(manualLinks[key]);
     }
     if (!cust) cust = byNameKey.get(key);
-    // fallback fuzzy: contained substring
-    if (!cust) {
+    // Safer fuzzy fallback: only accept if the two normalized names are
+    // very close in length (avoids a short customer name being greedily
+    // grabbed as a substring of a much longer collections row and stealing
+    // the wrong customer's collections).
+    if (!cust && key) {
+      const matches: Customer[] = [];
       for (const c of byNameKey.values()) {
-        if (c.nameKey && (c.nameKey.includes(key) || key.includes(c.nameKey))) {
-          cust = c;
-          break;
-        }
+        if (!c.nameKey) continue;
+        const a = c.nameKey;
+        const b = key;
+        if (!(a.includes(b) || b.includes(a))) continue;
+        const minLen = Math.min(a.length, b.length);
+        const maxLen = Math.max(a.length, b.length);
+        // require the shorter name to cover at least 70% of the longer
+        // AND at least 8 chars total, else it's not distinctive enough
+        if (minLen >= 8 && minLen / maxLen >= 0.7) matches.push(c);
       }
+      // only auto-match when there is exactly one candidate
+      if (matches.length === 1) cust = matches[0];
     }
     if (!cust) {
       unmatched.push(col);
       continue;
     }
-    cust.collections[col.year] = col.monthly.slice();
+    // Accumulate element-wise so duplicate collection rows for the same
+    // (customer, year) are summed instead of overwritten — keeps
+    // collections[year] consistent with collectionsByYear[year].
+    const prev = cust.collections[col.year] ?? EMPTY();
+    const merged = prev.slice();
+    for (let i = 0; i < 12; i++) merged[i] = (merged[i] ?? 0) + (col.monthly[i] ?? 0);
+    cust.collections[col.year] = merged;
     cust.collectionsByYear[col.year] = (cust.collectionsByYear[col.year] ?? 0) + col.total;
     cust.collectionsAll += col.total;
     const lastM = findLastNonZero(col.monthly);

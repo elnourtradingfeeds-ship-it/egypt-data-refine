@@ -95,15 +95,6 @@ function CollectionsPage() {
   const salesFor = (c: (typeof customers)[number]) =>
     year === "all" ? c.salesAll : (c.salesByYear[year as number] ?? 0);
 
-  const topDebtors = useMemo(
-    () =>
-      customers
-        .map((c) => ({ c, bal: balFor(c) }))
-        .filter((r) => r.bal > 0)
-        .sort((a, b) => b.bal - a.bal)
-        .slice(0, 15),
-    [customers, year], // eslint-disable-line react-hooks/exhaustive-deps
-  );
 
   const bestPayers = useMemo(
     () =>
@@ -153,16 +144,6 @@ function CollectionsPage() {
         </tr>`,
       )
       .join("");
-    const debtorRows = topDebtors
-      .map(
-        (r, i) => `<tr>
-          <td class="num">${i + 1}</td>
-          <td>${escapeHtml(r.c.name)}<div class="muted">${escapeHtml(r.c.code)}</div></td>
-          <td class="num">${fmtInt(r.bal)}</td>
-          <td class="num">${fmtPct(rateFor(r.c))}</td>
-        </tr>`,
-      )
-      .join("");
     const paretoRows = paretoCollections
       .map(
         (r) => `<tr>
@@ -185,8 +166,6 @@ function CollectionsPage() {
       <table><thead><tr><th>#</th><th>العميل</th><th>الرصيد المستحق</th><th>التراكمي %</th><th>التحصيل %</th></tr></thead><tbody>${debtRows}</tbody></table>
       <h2>Pareto — أعلى 15 عميل بالمقبوضات</h2>
       <table><thead><tr><th>#</th><th>العميل</th><th>المقبوضات</th><th>التراكمي %</th></tr></thead><tbody>${paretoRows}</tbody></table>
-      <h2>أعلى المديونين</h2>
-      <table><thead><tr><th>#</th><th>العميل</th><th>الرصيد</th><th>التحصيل %</th></tr></thead><tbody>${debtorRows}</tbody></table>
     `;
     printHtml(`تقرير المقبوضات — ${label}`, html, { orientation: "landscape" });
   }
@@ -354,21 +333,12 @@ function CollectionsPage() {
         </div>
       </Section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Section title={`أعلى 15 مديون · ${label}`}>
-          <RankedTable
-            columns={["الكود", "الاسم", "الرصيد", "التحصيل %"]}
-            rows={topDebtors.map((r) => [r.c.code, r.c.name, fmtEGP(r.bal), fmtPct(rateFor(r.c))])}
-          />
-        </Section>
-
-        <Section title={`أفضل 10 ملتزمين · ${label}`} description="نسبة تحصيل عالية على مبيعات > 100 ألف">
-          <RankedTable
-            columns={["الكود", "الاسم", "المبيعات", "التحصيل %"]}
-            rows={bestPayers.map((r) => [r.c.code, r.c.name, fmtEGP(r.sales), fmtPct(r.rate)])}
-          />
-        </Section>
-      </div>
+      <Section title={`أفضل 10 ملتزمين · ${label}`} description="نسبة تحصيل عالية على مبيعات > 100 ألف">
+        <RankedTable
+          columns={["الكود", "الاسم", "المبيعات", "التحصيل %"]}
+          rows={bestPayers.map((r) => [r.c.code, r.c.name, fmtEGP(r.sales), fmtPct(r.rate)])}
+        />
+      </Section>
     </div>
   );
 }
