@@ -333,21 +333,12 @@ function CollectionsPage() {
         </div>
       </Section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Section title={`أعلى 15 مديون · ${label}`}>
-          <RankedTable
-            columns={["الكود", "الاسم", "الرصيد", "التحصيل %"]}
-            rows={topDebtors.map((r) => [r.c.code, r.c.name, fmtEGP(r.bal), fmtPct(rateFor(r.c))])}
-          />
-        </Section>
-
-        <Section title={`أفضل 10 ملتزمين · ${label}`} description="نسبة تحصيل عالية على مبيعات > 100 ألف">
-          <RankedTable
-            columns={["الكود", "الاسم", "المبيعات", "التحصيل %"]}
-            rows={bestPayers.map((r) => [r.c.code, r.c.name, fmtEGP(r.sales), fmtPct(r.rate)])}
-          />
-        </Section>
-      </div>
+      <Section title={`أفضل 10 ملتزمين · ${label}`} description="نسبة تحصيل عالية على مبيعات > 100 ألف">
+        <RankedTable
+          columns={["الكود", "الاسم", "المبيعات", "التحصيل %"]}
+          rows={bestPayers.map((r) => [r.c.code, r.c.name, fmtEGP(r.sales), fmtPct(r.rate)])}
+        />
+      </Section>
     </div>
   );
 }
