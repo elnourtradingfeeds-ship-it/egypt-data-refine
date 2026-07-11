@@ -166,8 +166,6 @@ function CollectionsPage() {
       <table><thead><tr><th>#</th><th>العميل</th><th>الرصيد المستحق</th><th>التراكمي %</th><th>التحصيل %</th></tr></thead><tbody>${debtRows}</tbody></table>
       <h2>Pareto — أعلى 15 عميل بالمقبوضات</h2>
       <table><thead><tr><th>#</th><th>العميل</th><th>المقبوضات</th><th>التراكمي %</th></tr></thead><tbody>${paretoRows}</tbody></table>
-      <h2>أعلى المديونين</h2>
-      <table><thead><tr><th>#</th><th>العميل</th><th>الرصيد</th><th>التحصيل %</th></tr></thead><tbody>${debtorRows}</tbody></table>
     `;
     printHtml(`تقرير المقبوضات — ${label}`, html, { orientation: "landscape" });
   }
