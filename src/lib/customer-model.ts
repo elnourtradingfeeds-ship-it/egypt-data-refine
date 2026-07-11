@@ -134,7 +134,7 @@ export function buildCustomers(
       c = {
         code: s.code,
         name: s.name,
-        nameKey: s.nameKey,
+        nameKey: normalizeName(s.name),
         sales: {},
         collections: {},
         salesByYear: {},
